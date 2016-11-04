@@ -1,0 +1,138 @@
+#!/bin/bash
+# tmux-session.  Starts a consistently-named tmux session; if there is already
+# an existing session, use that instead.
+
+###############################################################################
+### Configuration #############################################################
+###############################################################################
+
+CONFIG_DIR=~/.config/config.d/tmux
+BASENAME=`basename $0`
+
+## Name of the tmux session
+NAME=${1:-UNSET}
+
+## Count of the tmux session - that is, connect multiple times?
+COUNT=${2:-UNSET}
+
+###############################################################################
+### Functions #################################################################
+###############################################################################
+
+# sets tmux_nb to the number of tmux entries matching the name
+tmux_count() {
+    tmux_nb=$(echo `tmux ls 2> /dev/null | egrep "^${1}:" | wc -l`)
+}
+
+###############################################################################
+### main () ###################################################################
+###############################################################################
+
+if [ "$1" == "UNSET" ]; then
+    echo "Usage: $BASENAME SESSION [COUNT]"
+    exit 1
+fi
+
+tmux_count $NAME
+
+if [[ "$tmux_nb" == "0" ]]; then
+    if [ -f "${CONFIG_DIR}/${NAME}" ]; then
+        . ${CONFIG_DIR}/${NAME}
+    else
+        tmux new-session -d -s ${NAME} -n ${NAME}
+    fi
+    tmux select-window -t ${NAME}:0
+    exec tmux attach-session -t ${NAME}
+
+elif [[ "$COUNT" != "UNSET" ]]; then
+    new="${NAME}-${COUNT}"
+    tmux_count $new
+    if [[ "$tmux_nb" == "0" ]]; then
+        tmux new-session -d -t $NAME -s $new
+        exec tmux attach-session -t $new \; set-option destroy-unattached
+    else
+        exec tmux attach-session -t ${NAME}-${1}
+    fi
+
+else
+    exec tmux attach-session -t ${NAME}
+fi
+
+exit 0
+
+###############################################################################
+### Documentation #############################################################
+###############################################################################
+
+# Documentation.  Use a hack to hide this from the shell.  Because of the
+# above exit line, this should never be executed.
+DOCS=<<__END_OF_DOCS__
+
+=head1 NAME
+
+tmux-session - manage named tmux sessions
+
+=head1 SYNOPSIS
+
+B<tmux-session> I<name>
+
+B<tmux-session> I<name> I<count>
+
+=head1 DESCRIPTION
+
+tmux-session manages arbitrary tmux sessions with consistent names, so that we
+can connect to them multiple times.  
+
+=head1 USAGE
+
+=over 4
+
+=item I<name>
+
+Name of the session to connect to, as well as the configuration file to load 
+in F<~/config/config.d/tmux/*>.  Use something memorable.
+
+=item (I<count>)
+
+If set, connect to another instance of the same session.  This emulates the old
+screen behaviour, where you can have multiple sessions looking at different
+windows.  Once this session closes, the extra sessions disappear.
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item B<~/.config/config.d/tmux/*>
+
+If a file in this directory matches I<name>, it will be loaded to create
+a custom tmux session, rather than just building something empty.
+These files must at least include 'tmux new-session'.  
+
+A sample configuration:
+
+    tmux new-session -d -s locust -n 'daishi' 'ssh-krb5 daishi.fnal.gov'
+    tmux new-window -t locust:1   -n 'kf1'
+    tmux new-window -t locust:2   -n 'kf2'
+    tmux new-window -t locust:3   -n 'log'    'log-weekly'
+    tmux new-window -t locust:4   -n 'flea'   'ssh flea.killfile.org'
+    tmux new-window -t locust:5   -n 'kodiak' 'ssh kodiak.killfile.org'
+
+=item B<~/.tmux.conf>
+
+Shared tmux configuration.
+
+=back
+
+=head1 SEE ALSO
+
+tmux(1)
+
+=head1 AUTHOR
+
+Tim Skirvin <tskirvin@killfile.org>
+
+=cut
+
+__END_OF_DOCS__

@@ -1,0 +1,97 @@
+#!/bin/sh
+# autossh + tmux-session - use a tcp-based method of keeping ssh connections
+# open, using tmux on the other end.
+
+###############################################################################
+### Configuration #############################################################
+###############################################################################
+
+## Name of the host we're connecting to
+HOST=${1:-UNSET}
+
+## Name of the tmux session
+NAME=${2:-}
+
+## Count of the tmux session - that is, connect multiple times to the same
+## session?
+COUNT=${3:-}
+
+## Autossh configuration - taken from the Koriech original script
+AUTOSSH_POLL=20
+AUTOSSH_PORT=$(awk 'BEGIN { srand(); do r = rand()*32000; while ( r < 20000 ); printf("%d\n",r)  }' < /dev/null)
+#AUTOSSH_GATETIME=30
+#AUTOSSH_LOGFILE=$HOST.log
+#AUTOSSH_DEBUG=yes
+#AUTOSSH_PATH=/usr/local/bin/ssh
+export AUTOSSH_POLL AUTOSSH_LOGFILE AUTOSSH_DEBUG AUTOSSH_PATH AUTOSSH_GATETIME AUTOSSH_PORT
+
+## where does tmux-session live on the other end?
+TMUX_SESSION="~/.config/bin/tmux-session"
+
+###############################################################################
+### main () ###################################################################
+###############################################################################
+
+if [ "X$HOST" = "X" ]; then
+    echo "usage: `basename $0` <host> [<session> [<count]]"
+    exit 1
+fi
+
+exec autossh -t $HOST "$TMUX_SESSION $NAME $COUNT"
+
+###############################################################################
+### Documentation #############################################################
+###############################################################################
+
+# Documentation.  Use a hack to hide this from the shell.  Because of the
+# above exit line, this should never be executed.
+DOCS=<<__END_OF_DOCS__
+
+=head1 NAME
+
+smux - autossh + tmux-session
+
+=head1 SYNOPSIS
+
+B<smux> I<ssiadmin1.fnal.gov> I<code>
+
+B<smux> I<ssiadmin1.fnal.gov> I<build> I<2>
+
+=head1 DESCRIPTION
+
+smux uses autossh to create and/or connect to remote tmux sessions, and keep
+those connections open.  tmux-session must be installed on the other end to 
+wrap tmux (and its location is defined in this script).
+
+=head1 USAGE
+
+=over 4
+
+=item I<hostname>
+
+Hostname to connect to.  Required.
+
+=item I<session_name>
+
+Session name.  Theoretically optional, but tmux-session may complain.
+
+=item I<session_count>
+
+Session count, in case you want to connect multiple times to the same session
+but with different control options.  Optional.
+
+=back
+
+=head1 SEE ALSO
+
+tmux(1), tmux-session
+
+=head1 AUTHOR
+
+Tim Skirvin <tskirvin@killfile.org>
+
+Based on code by Jinn Koriech: https://coderwall.com/p/aohfrg/smux-ssh-with-auto-reconnect-tmux-a-mosh-replacement
+
+=cut
+
+__END_OF_DOCS__
